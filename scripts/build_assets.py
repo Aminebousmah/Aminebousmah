@@ -42,12 +42,17 @@ TERMINAL = [
     ("out", [(MUTED, '"build it, measure it, make it better."')]),
 ]
 
-STACK = [
-    ("Data Engineering", CYAN, ["Python", "SQL", "Spark", "Kafka", "ClickHouse", "PostgreSQL"]),
-    ("Machine Learning", VIOLET, ["pandas", "scikit-learn", "LightGBM", "LLMs", "Forecasting"]),
-    ("Analytics & BI", AMBER, ["Power BI", "Power Query", "Excel", "Streamlit", "Plotly"]),
-    ("Cloud & Automation", EMERALD, ["Azure", "Fabric", "Docker", "FastAPI", "n8n", "Git"]),
-]
+# Stack: picked from the Malt skill list, kept to what the market asks for most
+STACK = {
+    "data": ("Data Engineering", "batch · streaming · lakehouse", CYAN,
+             ["Python", "SQL", "Spark", "Databricks", "Snowflake", "dbt", "Airflow", "Kafka", "PostgreSQL"]),
+    "ai": ("AI & Machine Learning", "ml · genai · mlops", VIOLET,
+           ["LLM", "RAG", "AI Agents", "LangChain", "MLflow", "scikit-learn", "XGBoost", "pandas"]),
+    "cloud": ("Cloud & DevOps", "cloud · containers · ci/cd", EMERALD,
+              ["AWS", "Azure", "Fabric", "Docker", "GitLab CI/CD", "FastAPI"]),
+    "bi": ("BI & Automation", "dashboards · workflow automation", AMBER,
+           ["Power BI", "Tableau", "n8n", "Make"]),
+}
 
 PROJECTS = [
     ("openlakehouse", "OpenLakehouse", "Data Platform", CYAN,
@@ -221,35 +226,155 @@ def terminal():
 
 # ----------------------------------------------------------------- stack
 def stack():
+    """Bento grid: 4 tiles, each with an animated mini-visual + skill chips."""
+    import math
     W, gap = 1000, 16
-    cw = (W - gap * 3) / 4
-    fs, ph, pgap, rgap, pad = 12.5, 26, 8, 10, 20
-    layouts, max_rows = [], 0
-    for _, _, items in STACK:
-        rows, cur, xw = [], [], 0
+    R1, R2 = 232, 212
+    H = R1 + gap + R2
+    fs, ph, pgap, rgap = 12, 25, 7, 7
+    css = """
+.draw{stroke-dasharray:1;stroke-dashoffset:0;animation:draw 7s ease-in-out infinite}
+@keyframes draw{0%{stroke-dashoffset:1}28%{stroke-dashoffset:0}100%{stroke-dashoffset:0}}
+.bar{transform-box:fill-box;transform-origin:50% 100%;animation:grow 6s cubic-bezier(.2,.7,.2,1) infinite}
+@keyframes grow{0%{transform:scaleY(.04)}22%{transform:scaleY(1)}86%{transform:scaleY(1)}100%{transform:scaleY(.04)}}
+"""
+    defs, body = [], []
+
+    def chips(items, x, y, maxw, col):
+        out, cx, cy = [], x, y
         for it in items:
-            w = mono_width(it, fs) + 22
-            if cur and xw + pgap + w > cw - 2 * pad:
-                rows.append(cur); cur, xw = [], 0
-            cur.append((it, w)); xw += (pgap if len(cur) > 1 else 0) + w
-        rows.append(cur)
-        layouts.append(rows); max_rows = max(max_rows, len(rows))
-    H = 74 + max_rows * (ph + rgap) + 10
-    b = []
-    for ci, ((title, col, _), rows) in enumerate(zip(STACK, layouts)):
-        x0 = ci * (cw + gap)
-        b.append(f'<rect x="{x0+.5:.1f}" y=".5" width="{cw-1:.1f}" height="{H-1}" rx="14" fill="{BG2}" stroke="{BORDER}"/>')
-        b.append(f'<rect x="{x0+pad:.1f}" y="0" width="36" height="2.5" rx="1.25" fill="{col}"/>')
-        b.append(f'<text x="{x0+pad:.1f}" y="40" class="sans" font-size="15.5" font-weight="700" fill="{TEXT}">{escape(title)}</text>')
-        b.append(f'<text x="{x0+cw-pad:.1f}" y="40" text-anchor="end" class="mono" font-size="11" fill="{DIM}">0{ci+1}</text>')
-        for ri, row in enumerate(rows):
-            y = 60 + ri * (ph + rgap)
-            x = x0 + pad
-            for it, w in row:
-                b.append(f'<rect x="{x:.1f}" y="{y}" width="{w:.1f}" height="{ph}" rx="7" fill="{col}" fill-opacity=".08" stroke="{col}" stroke-opacity=".3"/>'
-                         f'<text x="{x+w/2:.1f}" y="{y+17.5}" text-anchor="middle" class="mono" font-size="{fs}" fill="{TEXT}">{escape(it)}</text>')
-                x += w + pgap
-    write("stack.svg", svg(W, H, "".join(b), title="Tech stack"))
+            w = mono_width(it, fs) + 20
+            if cx > x and cx + w > x + maxw:
+                cx, cy = x, cy + ph + rgap
+            out.append(f'<rect x="{cx:.1f}" y="{cy}" width="{w:.1f}" height="{ph}" rx="6.5" fill="{col}" fill-opacity=".08" stroke="{col}" stroke-opacity=".32"/>'
+                       f'<text x="{cx + w/2:.1f}" y="{cy + 16.8:.1f}" text-anchor="middle" class="mono" font-size="{fs}" fill="#CBD5E4">{escape(it)}</text>')
+            cx += w + pgap
+        return "".join(out)
+
+    def tile(key, num, x0, y0, w, h, glow_xy):
+        title, sub, col, _ = STACK[key]
+        gid = f"gl-{key}"
+        defs.append(f'<radialGradient id="{gid}" cx="{glow_xy[0]}" cy="{glow_xy[1]}" r="{max(w, h)*0.7:.0f}" gradientUnits="userSpaceOnUse">'
+                    f'<stop stop-color="{col}" stop-opacity=".16"/><stop offset="1" stop-color="{col}" stop-opacity="0"/></radialGradient>')
+        return (f'<rect x=".5" y=".5" width="{w-1}" height="{h-1}" rx="16" fill="{BG2}" stroke="{BORDER}"/>'
+                f'<rect x=".5" y=".5" width="{w-1}" height="{h-1}" rx="16" fill="url(#{gid})"/>'
+                f'<circle cx="24" cy="35" r="4" fill="{col}"/>'
+                f'<text x="36" y="40.5" class="sans" font-size="17" font-weight="700" fill="{TEXT}">{escape(title)}</text>'
+                f'<text x="20" y="64" class="mono" font-size="11.5" fill="{DIM}">{escape(sub)}</text>'
+                f'<text x="{w-20}" y="40" text-anchor="end" class="mono" font-size="11" fill="{col}" fill-opacity=".8">{num}</text>')
+
+    # ---- A: data engineering — lakehouse layers with data falling through
+    wA = 580
+    _, _, col, items = STACK["data"]
+    g = [tile("data", "01", 0, 0, wA, R1, (wA - 120, 110))]
+    g.append(chips(items, 20, 118, 300, col))
+    cx, hw, hh, t = 452, 98, 25, 9
+    layers = [(70, "raw", "#1B2540", CYAN, .35), (124, "refined", "#1D2350", INDIGO, .45), (178, "curated", "#291F52", VIOLET, .6)]
+    for i, (cy, lab, fill, c, so) in reversed(list(enumerate(layers))):
+        g.append(f'<path d="M{cx-hw},{cy} L{cx},{cy+hh} L{cx},{cy+hh+t} L{cx-hw},{cy+t} Z" fill="{fill}" fill-opacity=".9" stroke="{c}" stroke-opacity="{so*.6:.2f}"/>'
+                 f'<path d="M{cx},{cy+hh} L{cx+hw},{cy} L{cx+hw},{cy+t} L{cx},{cy+hh+t} Z" fill="{fill}" fill-opacity=".7" stroke="{c}" stroke-opacity="{so*.6:.2f}"/>'
+                 f'<path d="M{cx-hw},{cy} L{cx},{cy-hh} L{cx+hw},{cy} L{cx},{cy+hh} Z" fill="{fill}" fill-opacity=".75" stroke="{c}" stroke-opacity="{so}">'
+                 f'<animate attributeName="stroke-opacity" values="{so};1;{so}" dur="2.4s" begin="{0.5 + i*0.55:.2f}s" repeatCount="indefinite"/></path>'
+                 f'<text x="{cx}" y="{cy+4}" text-anchor="middle" class="mono" font-size="10" letter-spacing="2.5" fill="{c}" fill-opacity=".85">{lab.upper()}</text>')
+    for k, dx in enumerate((-46, -16, 16, 46)):
+        for j in range(2):
+            b = k * 0.6 + j * 1.2
+            g.append(f'<circle cx="{cx+dx}" cy="22" r="2.6" fill="{CYAN}" opacity="0">'
+                     f'<animate attributeName="cy" values="22;{layers[0][0]};{layers[1][0]};{layers[2][0]};218" keyTimes="0;.25;.5;.75;1" dur="2.4s" begin="{b:.2f}s" repeatCount="indefinite"/>'
+                     f'<animate attributeName="fill" values="{CYAN};{CYAN};{INDIGO};{VIOLET};{VIOLET}" keyTimes="0;.25;.5;.75;1" dur="2.4s" begin="{b:.2f}s" repeatCount="indefinite"/>'
+                     f'<animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;.15;.5;.85;1" dur="2.4s" begin="{b:.2f}s" repeatCount="indefinite"/></circle>')
+    body.append(f'<g transform="translate(0,0)">{"".join(g)}</g>')
+
+    # ---- B: AI & ML — forecast chart (history drawn, then forecast + band)
+    xB, wB = wA + gap, W - wA - gap
+    _, _, col, items = STACK["ai"]
+    g = [tile("ai", "02", xB, 0, wB, R1, (wB - 60, 40))]
+    x1, x2, xn, yt, yb = 20, wB - 20, 260, 80, 140
+    n = 44
+    pts = []
+    for i in range(n + 1):
+        u = i / n
+        v = 0.38 + 0.32 * u + 0.16 * math.sin(u * 14) + 0.05 * math.sin(u * 37)
+        pts.append((x1 + u * (x2 - x1), yb - v * (yb - yt)))
+    hist = [p for p in pts if p[0] <= xn + 0.01]
+    fc = [p for p in pts if p[0] >= hist[-1][0] - 0.01]
+    poly = lambda ps: " ".join(f"{x:.1f},{y:.1f}" for x, y in ps)
+    band = [(x, y - 4 - 22 * (x - xn) / (x2 - xn)) for x, y in fc] + [(x, y + 4 + 22 * (x - xn) / (x2 - xn)) for x, y in reversed(fc)]
+    for k in range(4):
+        yy = yt + k * (yb - yt) / 3
+        g.append(f'<path d="M{x1} {yy:.1f} H{x2}" stroke="{GRID}" stroke-dasharray="2 4"/>')
+    defs.append(f'<clipPath id="fcclip"><rect x="{xB + hist[-1][0]:.1f}" y="0" width="0" height="{R1}">'
+                f'<animate attributeName="width" values="0;0;{x2 - xn + 6};{x2 - xn + 6}" keyTimes="0;.28;.42;1" dur="7s" repeatCount="indefinite"/></rect></clipPath>')
+    defs.append(f'<linearGradient id="histg" x1="{x1}" x2="{xn}" y1="0" y2="0" gradientUnits="userSpaceOnUse"><stop stop-color="{CYAN}"/><stop offset="1" stop-color="{INDIGO}"/></linearGradient>')
+    g.append(f'<path d="M{xn} {yt - 8} V{yb + 2}" stroke="{DIM}" stroke-dasharray="3 3"/>'
+             f'<text x="{xn + 5}" y="{yt - 1}" class="mono" font-size="9.5" fill="{DIM}">now</text>')
+    g.append(f'<g clip-path="url(#fcclip)" transform="translate({-xB},0)"><g transform="translate({xB},0)">'
+             f'<polygon points="{poly(band)}" fill="{VIOLET}" fill-opacity=".14"/>'
+             f'<polyline points="{poly(fc)}" stroke="{VIOLET}" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round"/>'
+             f'<circle cx="{fc[-1][0]:.1f}" cy="{fc[-1][1]:.1f}" r="3.5" fill="{VIOLET}"/></g></g>')
+    g.append(f'<polyline class="draw" pathLength="1" points="{poly(hist)}" stroke="url(#histg)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>')
+    g.append(chips(items, 20, 160, wB - 40, col))
+    body.append(f'<g transform="translate({xB},0)">{"".join(g)}</g>')
+
+    # ---- C: Cloud & DevOps — CI/CD pipeline lighting up stage by stage
+    yC, wC = R1 + gap, 404
+    _, _, col, items = STACK["cloud"]
+    g = [tile("cloud", "03", 0, yC, wC, R2, (wC - 60, 30))]
+    stages = ["commit", "build", "test", "deploy"]
+    xs = [44 + i * (wC - 88) / 3 for i in range(4)]
+    yy = 98
+    g.append(f'<path d="M{xs[0]} {yy} H{xs[-1]}" stroke="#25304A" stroke-width="2"/>')
+    g.append(f'<path d="M{xs[0]} {yy} H{xs[-1]}" stroke="{col}" stroke-width="2" stroke-dasharray="{xs[-1]-xs[0]:.0f}" stroke-dashoffset="{xs[-1]-xs[0]:.0f}">'
+             f'<animate attributeName="stroke-dashoffset" values="{xs[-1]-xs[0]:.0f};0;0;{xs[-1]-xs[0]:.0f}" keyTimes="0;.6;.92;1" dur="4.5s" repeatCount="indefinite"/></path>')
+    for i, (x, lab) in enumerate(zip(xs, stages)):
+        tk = i / 3 * 0.6
+        g.append(f'<circle cx="{x:.1f}" cy="{yy}" r="10" fill="{BG}" stroke="#2A3550" stroke-width="1.5"/>'
+                 f'<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;{tk:.3f};{tk + .03:.3f};.92;1" dur="4.5s" repeatCount="indefinite"/>'
+                 f'<circle cx="{x:.1f}" cy="{yy}" r="10" fill="{col}"/>'
+                 f'<path d="M{x-4:.1f},{yy} l2.8,2.8 l5.2,-5.6" stroke="{BG}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>'
+                 f'<text x="{x:.1f}" y="{yy + 27}" text-anchor="middle" class="mono" font-size="9.5" letter-spacing="1" fill="{DIM}">{lab}</text>')
+    g.append(chips(items, 20, 144, wC - 40, col))
+    body.append(f'<g transform="translate(0,{yC})">{"".join(g)}</g>')
+
+    # ---- D: BI & Automation — growing bar chart + trend line
+    xD, wD = wC + gap, W - wC - gap
+    _, _, col, items = STACK["bi"]
+    g = [tile("bi", "04", xD, yC, wD, R2, (wD - 120, 110))]
+    defs.append(f'<linearGradient id="barg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="{AMBER}"/><stop offset="1" stop-color="{ROSE}" stop-opacity=".55"/></linearGradient>')
+    vals = [.32, .45, .38, .55, .5, .66, .6, .74, .7, .84, .8, .95]
+    bx0, bw, bg_, base, mh = 318, 13, 8, 186, 118
+    tops = []
+    for i, v in enumerate(vals):
+        x = bx0 + i * (bw + bg_)
+        hgt = v * mh
+        tops.append((x + bw / 2, base - hgt - 8))
+        g.append(f'<rect class="bar" style="animation-delay:{i*0.07:.2f}s" x="{x}" y="{base - hgt:.1f}" width="{bw}" height="{hgt:.1f}" rx="3" fill="url(#barg)"/>')
+    g.append(f'<path d="M{bx0 - 6} {base + .5} H{bx0 + len(vals)*(bw+bg_)}" stroke="#2A3550"/>')
+    g.append(f'<polyline class="draw" pathLength="1" style="animation-delay:.6s" points="{poly(tops)}" stroke="{TEXT}" stroke-opacity=".7" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>')
+    # mini automation flow: trigger -> ai -> action, a packet travelling along it
+    ny, ns = 106, 30
+    nxs = [44, 146, 248]
+    defs.append(f'<path id="flow" d="M{nxs[0] + ns/2} {ny} C{nxs[0] + 60} {ny - 22} {nxs[1] - 60} {ny - 22} {nxs[1] - ns/2} {ny} '
+                f'M{nxs[1] + ns/2} {ny} C{nxs[1] + 60} {ny + 22} {nxs[2] - 60} {ny + 22} {nxs[2] - ns/2} {ny}"/>')
+    g.append(f'<use href="#flow" xlink:href="#flow" stroke="#2A3550" stroke-width="1.5" fill="none"/>')
+    glyphs = [
+        lambda x, y: f'<path d="M{x+1},{y-7} L{x-4},{y+1} H{x} L{x-1},{y+7} L{x+4},{y-1} H{x} Z"/>',
+        lambda x, y: f'<path d="M{x},{y-7} q1.4,5.6 7,7 q-5.6,1.4 -7,7 q-1.4,-5.6 -7,-7 q5.6,-1.4 7,-7z"/>',
+        lambda x, y: f'<path d="M{x-5},{y} l3.5,3.5 l6.5,-7"/>',
+    ]
+    for i, (x, lab) in enumerate(zip(nxs, ("trigger", "ai", "action"))):
+        g.append(f'<rect x="{x - ns/2}" y="{ny - ns/2}" width="{ns}" height="{ns}" rx="9" fill="{BG}" stroke="{col}" stroke-opacity=".45"/>'
+                 f'<g stroke="{col}" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round">{glyphs[i](x, ny)}</g>'
+                 f'<text x="{x}" y="{ny + 34}" text-anchor="middle" class="mono" font-size="9.5" letter-spacing="1" fill="{DIM}">{lab}</text>')
+    g.append(f'<circle r="3" fill="{AMBER}" filter="url(#bglow)"><animateMotion dur="2.8s" repeatCount="indefinite" keyPoints="0;1" keyTimes="0;1">'
+             f'<mpath href="#flow" xlink:href="#flow"/></animateMotion></circle>')
+    defs.append('<filter id="bglow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="2.5" result="b"/>'
+                '<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>')
+    g.append(chips(items, 20, 162, 280, col))
+    body.append(f'<g transform="translate({xD},{yC})">{"".join(g)}</g>')
+
+    content = f'<defs>{"".join(defs)}</defs>{"".join(body)}'
+    write("stack.svg", svg(W, H, content, css, "Tech stack: data engineering, AI & machine learning, cloud & DevOps, BI & automation"))
 
 
 # ----------------------------------------------------------------- project cards

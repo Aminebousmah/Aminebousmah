@@ -16,7 +16,7 @@
 <br /><br />
 
 <img src="assets/title-stack.svg" width="100%" alt="Stack" />
-<img src="assets/stack.svg" width="100%" alt="Python, SQL, Spark, Kafka, ClickHouse, PostgreSQL, pandas, scikit-learn, LightGBM, LLMs, Power BI, Power Query, Excel, Streamlit, Plotly, Azure, Fabric, Docker, FastAPI, n8n, Git" />
+<img src="assets/stack.svg" width="100%" alt="Python, SQL, Spark, Databricks, Snowflake, dbt, Airflow, Kafka, PostgreSQL, LLM, RAG, AI Agents, LangChain, MLflow, scikit-learn, XGBoost, pandas, AWS, Azure, Fabric, Docker, GitLab CI/CD, FastAPI, Power BI, Tableau, n8n, Make" />
 
 <br /><br />
 
